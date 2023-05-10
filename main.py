@@ -1,107 +1,106 @@
+import pandas as pd
+import cowsay
 
-
-def test_algorithm(observations, states, start_p, trans_p, emit_p):
-    probability = {"H": {},
-                   "L": {}}  # create prob matrix
-    print(probability)
-    prob_h = start_p['H'] * emit_p['H'][observations[0]]  # start to 1st observation prob for H
-    prob_l = start_p['L'] * emit_p['L'][observations[0]]  # start to 1st observation prob for L
-    previous_prob_h = prob_h
-    previous_prob_l = prob_l
-    probability.update({"H": {observations[0]: prob_h}})  # add prob to dict
-    probability.update({"L": {observations[0]: prob_l}})  # add prob to dict
-
-    #  Forward algorithm to calculate the probability of generating given seq:
-    for i in range (1, len(observations)):
-        prob_h = previous_prob_h * trans_p["H"]["H"] * emit_p['H'][observations[i]] + \
-                 previous_prob_l * trans_p["L"]["H"] * emit_p['H'][observations[i]]
-        prob_l = previous_prob_l * trans_p["L"]["L"] * emit_p["L"][observations[i]] + \
-                 previous_prob_h * trans_p["H"]["L"] * emit_p["L"][observations[i]]
-        probability["H"][observations[i] + str(i)] = prob_h
-        probability["L"][observations[i] + str(i)] = prob_l
-        previous_prob_h = prob_h
-        previous_prob_l = prob_l
-    print(probability)
-
-    return probability
-
-
-def viterbi_algorithm(observations, states, start_p, trans_p, emit_p):
-    V = [{}]
-    for st in states:
-        print(st)
-        V[0][st] = {"prob": start_p[st] * emit_p[st][observations[0]], "prev": None}
-
-    for t in range(1, len(observations)):
-        V.append({})
-        for st in states:
-            max_tr_prob = V[t - 1][states[0]]["prob"] * trans_p[states[0]][st]
-            prev_st_selected = states[0]
-            for prev_st in states[1:]:
-                tr_prob = V[t - 1][prev_st]["prob"] * trans_p[prev_st][st]
-                if tr_prob > max_tr_prob:
-                    max_tr_prob = tr_prob
-                    prev_st_selected = prev_st
-
-            max_prob = max_tr_prob * emit_p[st][observations[t]]
-            V[t][st] = {"prob": max_prob, "prev": prev_st_selected}
-
-    for line in dptable(V):
-        print(line)
-
-    opt = []
-    max_prob = 0.0
-    best_st = None
-
-    for st, data in V[-1].items():
-        if data["prob"] > max_prob:
-            max_prob = data["prob"]
-            best_st = st
-    opt.append(best_st)
-    previous = best_st
-
-    for t in range(len(V) - 2, -1, -1):
-        opt.insert(0, V[t + 1][previous]["prev"])
-        previous = V[t + 1][previous]["prev"]
-
-    print("The steps of states are " + " ".join(opt) + " with highest probability of %s" % max_prob)
-    return V
-
-
-def dptable(V):
-    yield " ".join(("%12d" % i) for i in range(len(V)))
-    for state in V[0]:
-        yield "%.7s: " % state + " ".join("%.7s" % ("%f" % v[state]["prob"]) for v in V)
-
-
-def check_seq(seq):
+#  Function to test sum of probabilities of each state (must be 1.0 for transitios and 1.0 for observations)
+def test_matrix_prob(matrix1, matrix2):
     result = True
-    for i in range(0, len(seq)):
-        if seq[i] == "A" or seq[i] == "C" or seq[i] == "T" or seq[i] == "G":
+    for n in range(matrix1.shape[0]):
+        sum_value = round(matrix1[n:n+1].sum(1).values[0], 5)
+        if sum_value == 1.0:
             pass
         else:
             result = False
+
+    for n in range(matrix2.shape[0]):
+        sum_value = round(matrix2[n:n+1].sum(1).values[0], 5)
+        if sum_value == 1.0:
+            pass
+        else:
+            result = False
+
     return result
 
 
-states = ("H", "L")
-start_p = {"H": 0.5, "L": 0.5}
-trans_p = {
-    "H": {"H": 0.5, "L": 0.5},
-    "L": {"H": 0.4, "L": 0.6},
-}
-emit_p = {
-    "H": {"A": 0.2, "C": 0.3, "G": 0.3, "T": 0.2},
-    "L": {"A": 0.3, "C": 0.2, "G": 0.2, "T": 0.3},
-}
-sequence = list('GGCTGAC')
-path = list('LLHHHHLLL')
+#  Function to test shapes of matrixes (transitions must be quadratic) and correctness of headers and indexes names
+def test_matrix_shape(transitions, emissions, chain):
+    result = True
+    transitions_shape = transitions.shape
 
-res = check_seq(sequence)
-if res:
-    prob = test_algorithm(sequence, states, start_p, trans_p, emit_p)
-    V = viterbi_algorithm(sequence, states, start_p, trans_p, emit_p)
-    dptable(V)
+    if transitions_shape[0] == transitions_shape[1]:
+        pass
+    else:
+        result = False
+
+    emissions_headers = list(emissions.columns)
+    emssions_index = list(emissions.head().index)
+    transitions_index = list(transitions.head().index)[1:]
+
+    if emssions_index == transitions_index:
+        pass
+    else:
+        result = False
+
+    for item in chain:
+        if item in emissions_headers:
+           pass
+        else:
+            result = False
+
+    return result
+
+
+def forward_algorithm(transitions, emissions, chain):
+    states = list(transitions.columns)  # list of states
+
+    probabilities = {}  # empty dict
+    keys = range(1, transitions.shape[0])  # create keys to add to dict
+
+    for i in keys:
+        probabilities[i] = {}  # add keys to dict
+
+    # calculate
+    for m in range(1, len(states)):
+        probabilities[m][chain[0]] = transitions[states[m]].values[0] * emissions[chain[0]].values[m-1]
+
+    # previous observation
+    previous = chain[0]
+
+    #  forward algorithm:
+    for k in range(1, len(chain)):  # this loop change observation
+        obser_number = str(k) + '_' + chain[k]  # create key for observation
+        for i in range(1, len(states)):  # this loop change state
+            probabilities[i][obser_number] = 0
+            for j in range(1, len(states)):  # this loop adds probabilities for 'k' observation at 'i' state
+                probabilities[i][obser_number] = probabilities[i][obser_number] + probabilities[j][previous] * \
+                                             transitions[states[i]].values[j] * emissions[chain[k]].values[i-1]
+        previous = obser_number  # remember previous observation name
+
+    total_probability = 0
+    #  sum probabilities
+    for i in keys:
+        total_probability = total_probability + probabilities[i][previous]
+
+    return total_probability
+
+
+print(cowsay.trex("Witajcie!"))
+transitions_matrix = pd.read_csv('transitions_matrix.csv', header=0, index_col=0)  # read transitions matrix
+# (in next steps emssions matrix and chain) to DataFrame
+emission_matrix = pd.read_csv('emissions_matrix.csv', header=0, index_col=0)
+chain = pd.read_csv('chain.csv', header=None)
+observations = chain[0:1].values[0]
+print("Observations:", observations)
+print(transitions_matrix)
+print(emission_matrix)
+result = test_matrix_prob(transitions_matrix, emission_matrix)
+result2 = test_matrix_shape(transitions_matrix, emission_matrix, observations)
+#  If both 'test matrix' functions return True 'forward_algorithm' calculate the probability
+if result:
+    if result2:
+        total = forward_algorithm(transitions_matrix, emission_matrix, observations)
+        # print("Probability of given path is:", total)
+
 else:
-    print("Insert correct sequence(allowed: A C T G")
+    print("Check instruction")
+
 
