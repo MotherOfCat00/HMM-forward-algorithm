@@ -83,7 +83,6 @@ def forward_algorithm(transitions, emissions, chain):
     return total_probability
 
 
-print(cowsay.trex("Witajcie!"))
 transitions_matrix = pd.read_csv('transitions_matrix.csv', header=0, index_col=0)  # read transitions matrix
 # (in next steps emssions matrix and chain) to DataFrame
 emission_matrix = pd.read_csv('emissions_matrix.csv', header=0, index_col=0)
